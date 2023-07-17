@@ -4,6 +4,7 @@
 // flag varible to determine current editing mode
 let editMode = "select";
 let isGridOn = false;
+
 const HEIGHT = 600;
 const WIDTH = 700;
 // the four values correspond to int values of points on a line (x1,y1,x2,y2)
@@ -62,7 +63,7 @@ const EPLTOPL_DIGBOX = [2, 2, 15, 28];
  * @returns {string} The formatted measurement string.
  */
 function formatMeasurement(measurement) {
-  
+
   if (measurement.length == 1) {
     return "0" + measurement + "m";
   } else if (measurement.length == 2) {
@@ -72,14 +73,32 @@ function formatMeasurement(measurement) {
   }
 }
 
+function downloadURI(uri, name) {
+  var link = document.createElement('a');
+  link.download = name;
+  link.href = uri;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 /**
- * Removes all children from the layer and redraws the layer.
+ * Updates the edit mode text on the page.
  */
+
+function updateEditMode(editMode) {
+  document.querySelector("#editmode").innerHTML = "Mode: " + editMode;
+}
+
 function wipeCanvas() {
   layer.destroyChildren();
   layer.draw();
 }
 
+/**
+ * Removes the Konva node that intersects with the current mouse position on the stage.
+ * If a node is removed, the layer is redrawn.
+ */
 function erase() {
   const mousePos = stage.getPointerPosition();
   const node = stage.getIntersection(mousePos);
@@ -89,10 +108,38 @@ function erase() {
   }
 }
 
+function drawPoint(x, y, colour) {
+  return new Konva.Circle({
+    x: x,
+    y: y,
+    radius: 2,
+    fill: colour,
+    stroke: colour,
+    strokeWidth: 1,
+    id: "point",
+  });
+}
+
+function initTransformer() {
+  const tr = new Konva.Transformer({
+    keepRatio: true,
+    ignoreStroke: true,
+  });
+  layer.add(tr);
+  return tr;
+}
+
+function snapToGrid(x, y) {
+  const gridSize = 10;
+  const newX = Math.round(x / gridSize) * gridSize;
+  const newY = Math.round(y / gridSize) * gridSize;
+  return { x: newX, y: newY };
+}
+
 //classes
 
 class Line {
-  constructor(colour,width, dash) {
+  constructor(colour, width, dash) {
     this.colour = colour;
     this.width = width;
     this.dash = dash;
@@ -106,8 +153,10 @@ class Line {
         strokeWidth: this.width,
         draggable: true,
         lineJoin: "round",
+        lineCap: "round",
         shadowEnabled: false,
         dash: this.dash,
+        hitStrokeWidth: 10,
       })
     );
   }
@@ -121,98 +170,325 @@ class Road extends Line {
 
 class Cable extends Line {
   constructor() {
-    super("black", 2, [10, 10]);
+    super("black", 2, [7, 7]);
+  }
+}
+
+class RegLine extends Line {
+  constructor() {
+    super("black", 1, 0);
+  }
+}
+
+
+class RegularArrow extends Line {
+  constructor() {
+    super("black", 1, 0);
+  }
+
+  draw(x1, y1, x2, y2) {
+    layer.add(
+      new Konva.Arrow({
+        points: [x1, y1, x2, y2],
+        stroke: this.colour,
+        strokeWidth: this.width,
+        fill: this.colour,
+        draggable: true,
+        lineJoin: "round",
+        shadowEnabled: false,
+        dash: this.dash,
+        hitStrokeWidth: 10,
+        pointerLength: 10,
+        pointerWidth: 10,
+        pointerAtBeginning: true,
+        pointerAtEnding: false,
+
+      })
+    );
+  }
+}
+
+class MeasurementArrow extends RegularArrow {
+
+}
+
+
+class Grid {
+  constructor(layer) {
+    this.layer = layer;
+    this.gridimg = null;
+    Konva.Image.fromURL("grid2.png", (img) => {
+      this.gridimg = img;
+      this.layer.add(this.gridimg);
+      this.layer.draw();
+      this.gridimg.moveToBottom();
+      this.gridimg.visible(false);
+    });
+  }
+
+  showGrid() {
+    if (this.gridimg) {
+      this.gridimg.visible(true);
+      this.layer.batchDraw();
+    } else {
+      setTimeout(() => {
+        this.showGrid();
+      }, 100);
+    }
+  }
+
+  hideGrid() {
+    if (this.gridimg) {
+      this.gridimg.visible(false);
+    } else {
+      setTimeout(() => {
+        this.hideGrid();
+      }, 100);
+    }
+  }
+}
+
+
+class Text {
+  constructor(fontSize) {
+    this.fontSize = fontSize;
+  }
+
+  draw(x, y, text) {
+    this.text = new Konva.Text({
+      x: x,
+      y: y,
+      text: text,
+      fontSize: 20,
+      fontFamily: "Calibri",
+      fill: "black",
+      draggable: true,
+    });
+    layer.add(this.text);
   }
 }
 
 
 
 
+
 // boilerplate code to set up the canvas
 const container = document.querySelector('#container');
-    const stage = new Konva.Stage({
-      container: container,
-      width: WIDTH,
-      height: HEIGHT,
-    });
-    const layer = new Konva.Layer();
-    stage.add(layer);
+const stage = new Konva.Stage({
+  container: container,
+  width: WIDTH,
+  height: HEIGHT,
 
-// draw the curb using Road from top of screen to bottom at x = 1/3 of screen width
-var r = new Road();
-var c = new Cable();
-c.draw(WIDTH / 2, 0, WIDTH / 2, HEIGHT);
-r.draw(WIDTH / 3, 0, WIDTH / 3, HEIGHT);
+});
+const layer = new Konva.Layer();
+const gridlayer = new Konva.Layer();
+stage.add(layer);
+stage.add(gridlayer);
+// move gridlayer to bottom
+gridlayer.moveToBottom();
+gridlayer.listening(false);
+tr = initTransformer();
+let grid = null;
+let road = null;
+let lineArr = [];
+
+
 
 //------EVENT HANDLERS------//
-//make the value of html element editmode match the value of editMode with event listener
 
-
-
-
-//add event listenter to clear button
+// BUTTON EVENT HANDLERS
 document.getElementById("clear").addEventListener("click", wipeCanvas);
 
-//bind wipeCanvas to w key and erase to x key
-document.addEventListener("keydown", function (event) {
-  if (event.key == "w") {
-    wipeCanvas();
-  } else if (event.key == "x") {
-    erase();
-  } else if (event.key == "r") {
-    //change editMode and editmode to road
-    editMode = "road";
-   
-  } else if (event.key == "s" || event.key == "Escape") {
-    editMode = "select";
-  } else if (event.key == "g") {
-    isGridOn = !isGridOn;
-    document.querySelector("#gridsnap").innerHTML = "Grid: " + isGridOn;
+document.getElementById("road").addEventListener("click", () => {
+  editMode = "road";
+  updateEditMode(editMode);
+});
+
+document.getElementById("cable").addEventListener("click", () => {
+  editMode = "cable";
+  updateEditMode(editMode);
+});
+
+document.getElementById("line").addEventListener("click", () => {
+  editMode = "line";
+  updateEditMode(editMode);
+});
+
+
+
+//add event listener to save button
+document.getElementById('save').addEventListener(
+  'click',
+  () => {
+    // make sure the gridlayer is hidden
+    grid.hideGrid();
+    // save the stage as a png
+    var dataURL = stage.toDataURL();
+    downloadURI(dataURL, 'stage.png');
+  },
+  false
+);
+
+// KEYBOARD EVENT HANDLERS
+
+document.addEventListener("keydown", (event) => {
+  switch (event.key) {
+    case "w":
+      wipeCanvas();
+      break;
+    case "x":
+      erase();
+      break;
+    case "r":
+      //change editMode and editmode to road
+      editMode = "road";
+      break;
+    case "c":
+      editMode = "cable";
+      break;
+    case "l":
+      editMode = "line";
+      break;
+    case "s":
+    case "Escape":
+      editMode = "select";
+      break;
+    case "g":
+      if (!grid) {
+        grid = new Grid(gridlayer);
+      }
+      if (isGridOn) {
+        grid.hideGrid();
+      } else {
+        grid.showGrid();
+      }
+      isGridOn = !isGridOn;
+      document.querySelector("#gridsnap").innerHTML = "Grid: " + isGridOn;
+      break;
+    default:
+      break;
   }
   document.querySelector("#editmode").innerHTML = "Mode: " + editMode;
 });
 
-var tr = new Konva.Transformer({
-  resizeByCenter: false,
+// MOUSE EVENT HANDLERS
+
+stage.on("mousemove", () => {
+  document.querySelector("#debug1").innerHTML = Object.values(stage.getPointerPosition());
 });
-layer.add(tr);
+
 
 // if users clicks on a node, select it and add a transformer
 
-stage.on("pointerclick", function (e) {
-  if (e.target === stage) {
-    tr.nodes([]);
-    layer.draw();
-    return;
+stage.on("pointerclick", (e) => {
+
+  // always get pointer position
+  const pos = stage.getPointerPosition();
+  pos.x = isGridOn ? Math.round(pos.x / 10) * 10: pos.x;
+  pos.y = isGridOn ? Math.round(pos.y / 10) * 10: pos.y;
+
+  // if transformer has been destroyed, create a new one
+  if (!tr) {
+    tr = initTransformer();
   }
-  tr.nodes([e.target]);
+
+  switch (editMode) {
+
+    case "select":
+      if (e.target === stage) {
+        tr.nodes([]);
+        layer.draw();
+        return;
+      }
+      tr.nodes([e.target]);
+      break;
+
+    case "line":
+      lineArr.push(pos.x, pos.y);
+      if (lineArr.length === 4) {
+        l1.remove();
+        line = new RegLine();
+        line.draw(lineArr[0], lineArr[1], lineArr[2], lineArr[3]);
+        lineArr = [];
+      } else {
+        l1 = drawPoint(pos.x, pos.y, "blue");
+        layer.add(l1);
+      }
+      break;
+
+
+    case "road":
+      lineArr.push(pos.x, pos.y);
+      if (lineArr.length === 4) {
+        r1.remove();
+        road = new Road();
+        road.draw(lineArr[0], lineArr[1], lineArr[2], lineArr[3]);
+        lineArr = [];
+      } else {
+        r1 = drawPoint(pos.x, pos.y, "purple");
+        layer.add(r1);
+      }
+      break;
+
+    case "cable":
+      lineArr.push(pos.x, pos.y);
+      if (lineArr.length === 4) {
+        c1.remove();
+        cable = new Cable();
+        cable.draw(lineArr[0], lineArr[1], lineArr[2], lineArr[3]);
+        lineArr = [];
+      } else {
+        c1 = drawPoint(pos.x, pos.y, "red");
+        layer.add(c1);
+      }
+      break;
+
+    default:
+      break;
+  }
+  updateEditMode(editMode);
 });
 
-stage.on("pointerover", function (e) {
+stage.on("pointerover", () => {
   const mousePos = stage.getPointerPosition();
   const node = stage.getIntersection(mousePos);
   if (node) {
+
+    // get a reference to node for use in handlers
+    const currentnode = node;
     stage.container().style.cursor = "pointer";
+
+    // change stroke color on hover
+    currentnode.on("pointerover", () => {
+      currentnode.stroke("red");
+    });
+    // change stroke color back on hover out
+    currentnode.on("pointerout", () => {
+      currentnode.stroke("black");
+    });
+    // snap to grid while dragging
+    currentnode.on("dragmove dragend", () => {
+      currentnode.position({
+        x: isGridOn ? Math.round(currentnode.x() / 10) * 10 : currentnode.x(),
+        y: isGridOn ? Math.round(currentnode.y() / 10) * 10 : currentnode.y(),
+      });
+    });
+
   } else {
     stage.container().style.cursor = "default";
   }
 });
 
 
-// if editmode is road draw a road by dragging
-stage.on("dragstart", function (e) {
-  if (editMode == "road") {
-    const pos = stage.getPointerPosition();
-    road(pos.x, pos.y, pos.x, pos.y);
-  }
-});
 
-
-
-
-
-
-
+// TEST SECTION //
+var r = new Road();
+var c = new Cable();
+var arr = new RegularArrow();
+arr.draw(WIDTH / 3, 100, WIDTH / 3 - 30, 100);
+arr.draw(WIDTH / 2, 100, WIDTH / 2 + 30, 100);
+c.draw(5, 10, 5, 70);
+r.draw(WIDTH / 3, 0, WIDTH / 3, HEIGHT);
 
 
 

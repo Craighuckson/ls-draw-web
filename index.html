@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LocateDraw</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <p id="editmode">Mode: </p>
-  <p id="gridsnap">Grid Snap:</p>
+  <div>
+    <p id="debug1"> </p>
+    <p id="editmode">Mode: </p>
+    <p id="gridsnap">Grid Snap:</p>
+  </div>
   <div id="container"></div>
   <div id="buttons">
     <button id="line">Line</button>
@@ -17,7 +22,8 @@
     <button id="clear">Clear</button>
     <button id="save">Save</button>
 
-  <script src="https://cdn.jsdelivr.net/npm/konva@8.3.1/konva.min.js"></script>
-  <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/konva@8.3.1/konva.min.js"></script>
+    <script src="script.js"></script>
 </body>
+
 </html>
