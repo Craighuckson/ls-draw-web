@@ -229,6 +229,7 @@ class Grid {
   showGrid() {
     if (this.gridimg) {
       this.gridimg.visible(true);
+      this.layer.batchDraw();
     } else {
       setTimeout(() => {
         this.showGrid();
