@@ -259,7 +259,7 @@ class Text {
       x: x,
       y: y,
       text: text,
-      fontSize: 20,
+      fontSize: this.fontSize,
       fontFamily: "Calibri",
       fill: "black",
       draggable: true,
