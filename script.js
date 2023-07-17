@@ -373,9 +373,9 @@ document.addEventListener("keydown", (event) => {
 
 // MOUSE EVENT HANDLERS
 
-stage.on("mousemove", () => {
-  document.querySelector("#debug1").innerHTML = Object.values(stage.getPointerPosition());
-});
+// stage.on("mousemove", () => {
+//   document.querySelector("#debug1").innerHTML = Object.values(stage.getPointerPosition());
+// });
 
 
 // if users clicks on a node, select it and add a transformer
@@ -457,14 +457,22 @@ stage.on("pointerover", () => {
     // get a reference to node for use in handlers
     const currentnode = node;
     stage.container().style.cursor = "pointer";
-
+    //document.querySelector("#debug1").innerHTML = currentnode.getClassName();
     // change stroke color on hover
     currentnode.on("pointerover", () => {
+      if (currentnode.getClassName() === "Text") {
+        currentnode.fill("red");
+      } else {
       currentnode.stroke("red");
+      }
     });
     // change stroke color back on hover out
     currentnode.on("pointerout", () => {
+      if (currentnode.getClassName() === "Text") {
+        currentnode.fill("black");
+      } else {
       currentnode.stroke("black");
+      }
     });
     // snap to grid while dragging
     currentnode.on("dragmove dragend", () => {
@@ -487,8 +495,9 @@ var c = new Cable();
 var arr = new RegularArrow();
 arr.draw(WIDTH / 3, 100, WIDTH / 3 - 30, 100);
 arr.draw(WIDTH / 2, 100, WIDTH / 2 + 30, 100);
-c.draw(5, 10, 5, 70);
 r.draw(WIDTH / 3, 0, WIDTH / 3, HEIGHT);
+let t = new Text();
+t.draw(100, 100, "Hello World");
 
 
 
