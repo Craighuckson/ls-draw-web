@@ -410,7 +410,7 @@ stage.on("pointerclick", (e) => {
     case "select":
       if (e.target === stage) {
         tr.nodes([]);
-        layer.draw();xxxxx
+        layer.draw(); // Removed 'xxxxx'
         return;
       }
       tr.nodes([e.target]);
@@ -461,40 +461,51 @@ stage.on("pointerclick", (e) => {
   updateEditMode(editMode);
 });
 
-stage.on("pointerover", () => {
-  const mousePos = stage.getPointerPosition();
-  const node = stage.getIntersection(mousePos);
-  if (node) {
-    // get a reference to node for use in handlers
-    const currentnode = node;
+// Use event delegation for hover effects and drag snapping
+layer.on("mouseover", (evt) => {
+  const shape = evt.target;
+  // Ensure it's a shape and not the layer/stage, and not part of the transformer
+  if (shape && shape !== layer && shape !== stage && shape !== tr) {
     stage.container().style.cursor = "pointer";
-    //document.querySelector("#debug1").innerHTML = currentnode.getClassName();
-    // change stroke color on hover
-    currentnode.on("pointerover", () => {
-      if (currentnode.getClassName() === "Text") {
-        currentnode.fill("red");
-      } else {
-        currentnode.stroke("red");
-      }
-    });
-    // change stroke color back on hover out
-    currentnode.on("pointerout", () => {
-      if (currentnode.getClassName() === "Text") {
-        currentnode.fill("black");
-      } else {
-        currentnode.stroke("black");
-      }
-    });
-    // snap to grid while dragging
-    currentnode.on("dragmove dragend", () => {
-      currentnode.position({
-        x: isGridOn ? Math.round(currentnode.x() / 10) * 10 : currentnode.x(),
-        y: isGridOn ? Math.round(currentnode.y() / 10) * 10 : currentnode.y(),
-      });
-    });
-  } else {
-    stage.container().style.cursor = "default";
+    if (shape.getClassName() === "Text") {
+      shape.fill("red"); // Store original fill to revert if not always black
+    } else {
+      shape.stroke("red"); // Store original stroke
+    }
+    layer.batchDraw();
   }
 });
+
+layer.on("mouseout", (evt) => {
+  const shape = evt.target;
+  if (shape && shape !== layer && shape !== stage && shape !== tr) {
+    stage.container().style.cursor = "default";
+    if (shape.getClassName() === "Text") {
+      shape.fill("black"); // Revert to original fill
+    } else {
+      shape.stroke("black"); // Revert to original stroke
+    }
+    layer.batchDraw();
+  }
+});
+
+// Snap to grid while dragging for all draggable shapes on the layer
+layer.on("dragmove", (evt) => { // dragend is also an option if you only want to snap at the end
+  const shape = evt.target;
+  if (isGridOn && shape.draggable()) { // Ensure shape is draggable
+    const snappedPos = snapToGrid(shape.x(), shape.y()); // Use your utility
+    shape.position(snappedPos);
+  }
+});
+
+// If you only want to snap at the end of the drag:
+// layer.on("dragend", (evt) => {
+//   const shape = evt.target;
+//   if (isGridOn && shape.draggable()) {
+//     const snappedPos = snapToGrid(shape.x(), shape.y());
+//     shape.position(snappedPos);
+//     layer.batchDraw(); // Redraw after final position set
+//   }
+// });
 
 // TEST SECTION //
