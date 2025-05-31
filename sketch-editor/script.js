@@ -5,16 +5,36 @@
 let editMode = "select";
 let isGridOn = false;
 
-const HEIGHT = 600;
-const WIDTH = 700;
+const HEIGHT = 800;
+const WIDTH = 800;
 // the four values correspond to int values of points on a line (x1,y1,x2,y2)
 const ECURB = [WIDTH / 3, HEIGHT * 0.067, WIDTH / 3, HEIGHT * 0.933];
-const WCURB = [(WIDTH * 2) / 3, HEIGHT * 0.067, (WIDTH * 2) / 3, HEIGHT * 0.933];
-const NCURB = [WIDTH * (1 / WIDTH), (HEIGHT * 2) / 3, (WIDTH * 69) / WIDTH, (HEIGHT * 2) / 3];
+const WCURB = [
+  (WIDTH * 2) / 3,
+  HEIGHT * 0.067,
+  (WIDTH * 2) / 3,
+  HEIGHT * 0.933,
+];
+const NCURB = [
+  WIDTH * (1 / WIDTH),
+  (HEIGHT * 2) / 3,
+  (WIDTH * 69) / WIDTH,
+  (HEIGHT * 2) / 3,
+];
 const SCURB = [WIDTH * (1 / WIDTH), HEIGHT / 3, WIDTH - 2, HEIGHT / 3];
 
-const HNCURB = [NCURB[0], SCURB[1] + HEIGHT / 15, NCURB[2], SCURB[1] + HEIGHT / 15];
-const HSCURB = [SCURB[0], NCURB[1] - HEIGHT / 15, NCURB[2], NCURB[1] - HEIGHT / 15];
+const HNCURB = [
+  NCURB[0],
+  SCURB[1] + HEIGHT / 15,
+  NCURB[2],
+  SCURB[1] + HEIGHT / 15,
+];
+const HSCURB = [
+  SCURB[0],
+  NCURB[1] - HEIGHT / 15,
+  NCURB[2],
+  NCURB[1] - HEIGHT / 15,
+];
 
 // these are x,y (int) coordinates for street text labels
 const NSTREET = [WIDTH / 2, (NCURB[1] + HEIGHT) / 2];
@@ -53,7 +73,6 @@ const EPLTOPL_DIGBOX = [2, 2, 15, 28];
 
 //helper functions
 
-
 /**
  * Formats a measurement string to include a decimal point and "m" at the end.
  * If the string is one digit long, adds a leading zero.
@@ -63,7 +82,6 @@ const EPLTOPL_DIGBOX = [2, 2, 15, 28];
  * @returns {string} The formatted measurement string.
  */
 function formatMeasurement(measurement) {
-
   if (measurement.length == 1) {
     return "0" + measurement + "m";
   } else if (measurement.length == 2) {
@@ -74,7 +92,7 @@ function formatMeasurement(measurement) {
 }
 
 function downloadURI(uri, name) {
-  var link = document.createElement('a');
+  var link = document.createElement("a");
   link.download = name;
   link.href = uri;
   document.body.appendChild(link);
@@ -101,13 +119,26 @@ function wipeCanvas() {
  */
 function erase() {
   const mousePos = stage.getPointerPosition();
-  const node = stage.getIntersection(mousePos);
-  if (node) {
-    node.destroy();
+  const shapeToErase = stage.getIntersection(mousePos);
+  if (shapeToErase) {
+    // Check if the shape to erase is the transformer itself or part of it
+    if (tr && (shapeToErase === tr || shapeToErase.getAncestors().includes(tr))) {
+      tr.destroy();
+      tr = null; // Set tr to null so it gets re-initialized by pointerclick handler
+    } else {
+      // It's a regular shape, not the transformer
+      shapeToErase.destroy();
+      // If a transformer exists and was attached to other nodes,
+      // detaching it from all nodes ensures it doesn't point to a destroyed node.
+      // Konva might handle detachment from a single destroyed node automatically,
+      // but tr.nodes([]) is a safe reset.
+      if (tr) {
+        tr.nodes([]);
+      }
+    }
     layer.draw();
   }
 }
-
 function drawPoint(x, y, colour) {
   return new Konva.Circle({
     x: x,
@@ -180,7 +211,6 @@ class RegLine extends Line {
   }
 }
 
-
 class RegularArrow extends Line {
   constructor() {
     super("black", 1, 0);
@@ -202,16 +232,12 @@ class RegularArrow extends Line {
         pointerWidth: 10,
         pointerAtBeginning: true,
         pointerAtEnding: false,
-
       })
     );
   }
 }
 
-class MeasurementArrow extends RegularArrow {
-
-}
-
+class MeasurementArrow extends RegularArrow {}
 
 class Grid {
   constructor(layer) {
@@ -248,7 +274,6 @@ class Grid {
   }
 }
 
-
 class Text {
   constructor(fontSize) {
     this.fontSize = fontSize;
@@ -268,17 +293,12 @@ class Text {
   }
 }
 
-
-
-
-
 // boilerplate code to set up the canvas
-const container = document.querySelector('#container');
+const container = document.querySelector("#container");
 const stage = new Konva.Stage({
   container: container,
   width: WIDTH,
   height: HEIGHT,
-
 });
 const layer = new Konva.Layer();
 const gridlayer = new Konva.Layer();
@@ -291,8 +311,6 @@ tr = initTransformer();
 let grid = null;
 let road = null;
 let lineArr = [];
-
-
 
 //------EVENT HANDLERS------//
 
@@ -314,17 +332,15 @@ document.getElementById("line").addEventListener("click", () => {
   updateEditMode(editMode);
 });
 
-
-
 //add event listener to save button
-document.getElementById('save').addEventListener(
-  'click',
+document.getElementById("save").addEventListener(
+  "click",
   () => {
     // make sure the gridlayer is hidden
     grid.hideGrid();
     // save the stage as a png
     var dataURL = stage.toDataURL();
-    downloadURI(dataURL, 'stage.png');
+    downloadURI(dataURL, "stage.png");
   },
   false
 );
@@ -374,18 +390,16 @@ document.addEventListener("keydown", (event) => {
 // MOUSE EVENT HANDLERS
 
 // stage.on("mousemove", () => {
-//   document.querySelector("#debug1").innerHTML = Object.values(stage.getPointerPosition());
+//   document.querySelector("#debug1").innerHTML = Object.values(stagle.getPointerPosition());
 // });
-
 
 // if users clicks on a node, select it and add a transformer
 
 stage.on("pointerclick", (e) => {
-
   // always get pointer position
   const pos = stage.getPointerPosition();
-  pos.x = isGridOn ? Math.round(pos.x / 10) * 10: pos.x;
-  pos.y = isGridOn ? Math.round(pos.y / 10) * 10: pos.y;
+  pos.x = isGridOn ? Math.round(pos.x / 10) * 10 : pos.x;
+  pos.y = isGridOn ? Math.round(pos.y / 10) * 10 : pos.y;
 
   // if transformer has been destroyed, create a new one
   if (!tr) {
@@ -393,11 +407,10 @@ stage.on("pointerclick", (e) => {
   }
 
   switch (editMode) {
-
     case "select":
       if (e.target === stage) {
         tr.nodes([]);
-        layer.draw();
+        layer.draw();xxxxx
         return;
       }
       tr.nodes([e.target]);
@@ -415,7 +428,6 @@ stage.on("pointerclick", (e) => {
         layer.add(l1);
       }
       break;
-
 
     case "road":
       lineArr.push(pos.x, pos.y);
@@ -453,7 +465,6 @@ stage.on("pointerover", () => {
   const mousePos = stage.getPointerPosition();
   const node = stage.getIntersection(mousePos);
   if (node) {
-
     // get a reference to node for use in handlers
     const currentnode = node;
     stage.container().style.cursor = "pointer";
@@ -463,7 +474,7 @@ stage.on("pointerover", () => {
       if (currentnode.getClassName() === "Text") {
         currentnode.fill("red");
       } else {
-      currentnode.stroke("red");
+        currentnode.stroke("red");
       }
     });
     // change stroke color back on hover out
@@ -471,7 +482,7 @@ stage.on("pointerover", () => {
       if (currentnode.getClassName() === "Text") {
         currentnode.fill("black");
       } else {
-      currentnode.stroke("black");
+        currentnode.stroke("black");
       }
     });
     // snap to grid while dragging
@@ -481,17 +492,9 @@ stage.on("pointerover", () => {
         y: isGridOn ? Math.round(currentnode.y() / 10) * 10 : currentnode.y(),
       });
     });
-
   } else {
     stage.container().style.cursor = "default";
   }
 });
 
-
-
 // TEST SECTION //
-
-
-
-
-
