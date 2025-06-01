@@ -9,6 +9,7 @@ export class Line extends BaseShape {
             stroke: this.stroke,
             strokeWidth: this.strokeWidth,
             dash: this.dash,
+            hitStrokeWidth: 8,
             draggable: this.draggable,
         });
         this.addTo(scene);
