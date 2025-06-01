@@ -1,29 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LocateDraw</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Konva OOP Editor</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+        #toolbar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        #container {
+            flex: 1;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+    </style>
 </head>
-
 <body>
-  <div>
-    <p id="debug1"> </p>
-    <p id="editmode">Mode: </p>
-    <p id="gridsnap">Grid Snap:</p>
-  </div>
-  <div id="container"></div>
-  <div id="buttons">
-    <button id="line">Line</button>
-    <button id="road">Road</button>
-    <button id="cable">Cable</button>
-    <button id="clear">Clear</button>
-    <button id="save">Save</button>
+    <div id="toolbar">
+        <button id="road">Road</button>
+        <button id="cable">Cable</button>
+        <button id="line">Line</button>
+        <button id="save">Save</button>
+        <button id="clear">Clear</button>
+        <button id="gridsnap">Toggle Grid</button>
+        <span id="editmode">Mode: select</span>
+    </div>
+    <div id="container"></div>
 
-    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-    <script src="script.js"></script>
+    <!-- Load Konva and your bundled TypeScript app -->
+    <script type="module" src="./src/main.ts"></script>
 </body>
-
 </html>
