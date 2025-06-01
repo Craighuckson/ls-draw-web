@@ -1,13 +1,17 @@
-import Konva from "./konva.js";
+import Konva from "konva";
 
 export class Line {
-  constructor(colour, width, dash = []) {
+  colour: string;
+  width: number;
+  dash?: number[];
+  
+  constructor(colour: string, width: number, dash?: number[]) {
     this.colour = colour;
     this.width = width;
     this.dash = dash;
   }
 
-  draw(layer, x1, y1, x2, y2) {
+  draw(layer:Konva.Layer, x1:number, y1:number, x2:number, y2:number) {
     const line = new Konva.Line({
       points: [x1, y1, x2, y2],
       stroke: this.colour,
@@ -26,19 +30,19 @@ export class Line {
 
 export class RoadLine extends Line {
   constructor() {
-    super("black", 2), [];
+    super("black", 2);
   }
 }
 
 export class CableLine extends Line {
   constructor() {
-    super("black", 2, [7, 7]);
+    super("black", 2, [10,10  ]);
   }
 }
 
 export class RegLine extends Line {
   constructor() {
-    super("black", 1, 0);
+    super("black", 1, []);
   }
 }
 
@@ -47,7 +51,7 @@ export class RegularArrow extends Line {
     super("black", 1, 0);
   }
 
-  draw(layer, x1, y1, x2, y2) {
+  draw(layer:Konva.Layer, x1, y1, x2, y2) {
     const arrow = new Konva.Arrow({
       points: [x1, y1, x2, y2],
       stroke: this.colour,
@@ -69,6 +73,9 @@ export class RegularArrow extends Line {
 }
 
 export class Point {
+  x: any;
+  y: any;
+  colour: any;
   constructor(x, y, colour) {
     this.x = x;
     this.y = y;
@@ -92,6 +99,9 @@ export class Point {
 export class MeasurementArrow extends RegularArrow {}
 
 export class Grid {
+  gridLayer: any;
+  gridimg: null;
+  readyPromise: Promise<unknown>;
   constructor(gridLayer) {
     this.gridLayer = gridLayer;
     this.gridimg = null;
@@ -138,6 +148,8 @@ export class Grid {
 }
 
 export class Text {
+  fontSize: any;
+  textNode: null;
   constructor(fontSize) {
     this.fontSize = fontSize;
     this.textNode = null; // Initialize text to null

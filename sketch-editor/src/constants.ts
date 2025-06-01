@@ -1,7 +1,9 @@
+'use strict';
+
 export const HEIGHT = 800;
 export const WIDTH = 800;
 // the four values correspond to int values of points on a line (x1,y1,x2,y2)
-export const ECURB = [WIDTH / 3, HEIGHT * 0.067, WIDTH / 3, HEIGHT * 0.933];
+export const ECURB: number[] = [WIDTH / 3, HEIGHT * 0.067, WIDTH / 3, HEIGHT * 0.933];
 export const WCURB = [
   (WIDTH * 2) / 3,
   HEIGHT * 0.067,
