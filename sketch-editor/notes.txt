@@ -1,0 +1,418 @@
+Thanks for sharing your code! Now that I’ve reviewed it, I see why it’s feeling unwieldy—it’s doing a lot in a single file, mixing event handling, rendering logic, shape definitions, and UI state management. Let’s break it down into manageable, testable pieces while keeping things simple so you can start thinking about tests.
+
+Key Issues That Make It Hard to Manage
+- Mixing Concerns:
+- Your current file handles event handling, rendering, shape creation, and UI logic all at once.
+- This makes it harder to unit-test specific functionality.
+- Global State (editMode, tr, lineArr, etc.) Spread Everywhere:
+- These variables are used throughout the file without clear ownership.
+- Managing different states for drawing (lineArr), selection (tr), and UI (editMode) will get complicated as the app grows.
+- Direct Manipulation of Konva Objects in Event Handlers:
+- Many event handlers (pointerclick, mouseover, dragmove) directly modify shape properties.
+- Ideally, the Controller should interpret events and update the Model, and the View should react accordingly.
+
+Barebones Refactor to Make It Manageable
+To help you start testing sooner without full-fledged architecture, I recommend three simple files that separate concerns:
+/src
+│
+├── /core
+│   ├── CanvasManager.js     // Tracks shapes, handles serialization
+│   ├── ShapeFactory.js      // Creates shapes (e.g., lines, arrows, text)
+│   ├── TransformerManager.js // Handles Konva Transformer interactions
+│
+├── /ui
+│   ├── CanvasView.js        // Initializes Konva, updates rendering
+│   ├── UIController.js      // Handles user interactions, events
+│
+└── main.js                 // Bootstraps everything
+
+
+
+1. Creating a Minimal CanvasManager.js
+This helps manage your scene graph instead of modifying Konva objects directly inside event handlers:
+class CanvasManager {
+    constructor(stage) {
+        this.stage = stage;
+        this.layer = new Konva.Layer();
+        this.stage.add(this.layer);
+        this.shapes = [];  // Tracks created shapes
+    }
+
+    addShape(shape) {
+        this.shapes.push(shape);
+        this.layer.add(shape);
+        this.layer.draw();
+    }
+
+    removeShape(shape) {
+        shape.destroy();
+        this.shapes = this.shapes.filter(s => s !== shape);
+        this.layer.draw();
+    }
+}
+
+
+
+2. Extracting Shape Creation with ShapeFactory.js
+Instead of manually instantiating new Konva objects inside event handlers, this factory simplifies creation:
+class ShapeFactory {
+    static createLine(x1, y1, x2, y2) {
+        return new Konva.Line({
+            points: [x1, y1, x2, y2],
+            stroke: "black",
+            strokeWidth: 2,
+            draggable: true
+        });
+    }
+
+    static createText(x, y, text) {
+        return new Konva.Text({
+            x: x,
+            y: y,
+            text: text,
+            fontSize: 20,
+            fill: "black",
+            draggable: true
+        });
+    }
+}
+
+
+Now, whenever you need a shape, you just call:
+const line = ShapeFactory.createLine(100, 100, 200, 200);
+canvasManager.addShape(line);
+
+
+
+3. Managing Input in UIController.js
+Extract event handlers into a dedicated UIController that forwards events to CanvasManager:
+class UIController {
+    constructor(stage, canvasManager) {
+        this.stage = stage;
+        this.canvasManager = canvasManager;
+        this.editMode = "select";
+
+        this.stage.on("pointerclick", (e) => this.handleClick(e));
+    }
+
+    handleClick(e) {
+        const pos = this.stage.getPointerPosition();
+        pos.x = isGridOn ? Math.round(pos.x / 10) * 10 : pos.x;
+        pos.y = isGridOn ? Math.round(pos.y / 10) * 10 : pos.y;
+
+        if (this.editMode === "line") {
+            const line = ShapeFactory.createLine(pos.x, pos.y, pos.x + 50, pos.y + 50);
+            this.canvasManager.addShape(line);
+        }
+    }
+}
+
+
+
+4. Initializing Everything in main.js
+Finally, your main entry file ties everything together:
+import Konva from "konva";
+import CanvasManager from "./core/CanvasManager.js";
+import UIController from "./ui/UIController.js";
+
+const stage = new Konva.Stage({
+    container: "container",
+    width: 800,
+    height: 800
+});
+
+const canvasManager = new CanvasManager(stage);
+const uiController = new UIController(stage, canvasManager);
+
+
+
+Why This Helps?
+✔ Keeps each part isolated → You can test shape creation separately from event handling.
+✔ No more scattered global variables → The UIController tracks editMode, CanvasManager manages shapes.
+✔ Gradually extendable → You can later add an event bus, undo/redo, or new tools without breaking everything.
+Would this structure help you start coding and testing more easily? Let me know if you’d like help refining it further!
+
+
+You're right—the current UIController is intentionally basic, just to show how to start decoupling concerns. But as you expand it, you’ll need a more structured way to manage keyboard input, drag events, and tool-specific logic without bloating your event handlers with large switch statements.
+How to Manage Multiple Tools Without Huge Switch Statements
+Instead of using a massive switch block inside handleClick() or handleKeydown(), we can leverage polymorphism through a Tool interface or base class, allowing each tool to define its own behavior.
+1. Define a Base Tool Class
+Each tool—like LineTool, TextTool, or SelectionTool—inherits from a common Tool interface, ensuring each one knows how to handle events.
+class Tool {
+    constructor(canvasManager) {
+        this.canvasManager = canvasManager;
+    }
+
+    onMouseDown(event) {}
+    onKeyDown(event) {}
+    onDrag(event) {}
+}
+
+
+2. Create Tool-Specific Classes
+Each tool implements its own event handling logic:
+class LineTool extends Tool {
+    constructor(canvasManager) {
+        super(canvasManager);
+        this.lineArr = [];
+    }
+
+    onMouseDown(event) {
+        const pos = this.canvasManager.stage.getPointerPosition();
+        this.lineArr.push(pos.x, pos.y);
+
+        if (this.lineArr.length === 4) {
+            const line = ShapeFactory.createLine(
+                this.lineArr[0], this.lineArr[1], this.lineArr[2], this.lineArr[3]
+            );
+            this.canvasManager.addShape(line);
+            this.lineArr = []; // Reset after drawing
+        }
+    }
+}
+
+
+class SelectionTool extends Tool {
+    onMouseDown(event) {
+        const shape = event.target;
+        if (shape && shape !== this.canvasManager.layer && shape !== this.canvasManager.stage) {
+            this.canvasManager.transformer.nodes([shape]);
+        } else {
+            this.canvasManager.transformer.nodes([]);
+        }
+    }
+}
+
+
+
+3. Make UIController Tool-Aware
+Now, instead of checking editMode manually with switch statements, the UIController delegates events to the active tool dynamically:
+class UIController {
+    constructor(stage, canvasManager) {
+        this.stage = stage;
+        this.canvasManager = canvasManager;
+        this.tools = {
+            line: new LineTool(canvasManager),
+            select: new SelectionTool(canvasManager),
+            // Add more tools here
+        };
+        this.activeTool = this.tools.select;
+
+        this.stage.on("pointerclick", (e) => this.activeTool.onMouseDown(e));
+        document.addEventListener("keydown", (e) => this.activeTool.onKeyDown(e));
+        this.canvasManager.layer.on("dragmove", (e) => this.activeTool.onDrag(e));
+    }
+
+    setTool(toolName) {
+        if (this.tools[toolName]) {
+            this.activeTool = this.tools[toolName];
+        }
+    }
+}
+
+
+
+4. Handling Keyboard Events
+Now, instead of managing keyboard interactions inside UIController, each tool can override onKeyDown() to define tool-specific shortcuts:
+class TextTool extends Tool {
+    onKeyDown(event) {
+        if (event.key === "Escape") {
+            // Cancel text editing
+        } else if (event.key === "Enter") {
+            // Confirm text entry
+        }
+    }
+}
+
+
+
+5. Clean Tool Switching via UI
+Whenever the user selects a tool (from a button click, menu item, or keyboard shortcut), update the active tool:
+document.getElementById("line-tool-btn").addEventListener("click", () => {
+    uiController.setTool("line");
+});
+document.getElementById("select-tool-btn").addEventListener("click", () => {
+    uiController.setTool("select");
+});
+
+
+Or using a keyboard shortcut:
+document.addEventListener("keydown", (e) => {
+    if (e.key === "l") uiController.setTool("line");
+    if (e.key === "s") uiController.setTool("select");
+});
+
+
+
+Why This Helps
+✔ No large switch statements → Each tool manages its own logic separately.
+✔ Easily extendable → Adding new tools is as simple as defining a new class and registering it in UIController.
+✔ Decoupled architecture → The UIController doesn’t need to manually check editMode every time an event occurs—it just delegates to the active tool.
+Would this structure help make event handling cleaner and more scalable for you?
+
+Great! Now, let's slot the TransformerManager into this structure. The purpose of the Konva Transformer is to allow users to resize, rotate, and manipulate selected shapes. Instead of handling transformation logic directly inside the event handlers, we should encapsulate it inside a dedicated manager.
+
+1. What the TransformerManager Does
+- Manages a single Konva Transformer instance that attaches to selected shapes.
+- Provides methods for selecting, attaching, detaching, and updating transformations.
+- Ensures only one active selection at a time.
+- Keeps the UIController clean by offloading transformation logic.
+
+2. Implementing TransformerManager.js
+class TransformerManager {
+    constructor(canvasManager) {
+        this.canvasManager = canvasManager;
+        this.transformer = new Konva.Transformer({
+            keepRatio: true,
+            ignoreStroke: true
+        });
+
+        this.canvasManager.layer.add(this.transformer);
+    }
+
+    attachTo(shape) {
+        if (!shape) return;
+        this.transformer.nodes([shape]); // Attach transformer
+        this.canvasManager.layer.draw();
+    }
+
+    detach() {
+        this.transformer.nodes([]);
+        this.canvasManager.layer.draw();
+    }
+
+    toggleSelection(shape) {
+        if (this.transformer.nodes().includes(shape)) {
+            this.detach();
+        } else {
+            this.attachTo(shape);
+        }
+    }
+}
+
+
+
+3. Integrating TransformerManager Into CanvasManager
+Modify CanvasManager to include an instance of TransformerManager:
+import TransformerManager from "./TransformerManager.js";
+
+class CanvasManager {
+    constructor(stage) {
+        this.stage = stage;
+        this.layer = new Konva.Layer();
+        this.stage.add(this.layer);
+        this.transformerManager = new TransformerManager(this);
+        this.shapes = [];
+    }
+
+    addShape(shape) {
+        this.shapes.push(shape);
+        this.layer.add(shape);
+        this.layer.draw();
+    }
+
+    selectShape(shape) {
+        this.transformerManager.attachTo(shape);
+    }
+}
+
+
+
+4. Updating SelectionTool to Use TransformerManager
+Modify SelectionTool so that it hands off selection logic to TransformerManager:
+class SelectionTool extends Tool {
+    onMouseDown(event) {
+        const shape = event.target;
+        if (shape && shape !== this.canvasManager.layer && shape !== this.canvasManager.stage) {
+            this.canvasManager.transformerManager.toggleSelection(shape);
+        } else {
+            this.canvasManager.transformerManager.detach();
+        }
+    }
+}
+
+
+
+5. Ensuring UIController Delegates to SelectionTool
+Now, the UIController remains clean, and it simply routes pointer events to the active tool, which could be SelectionTool or LineTool:
+class UIController {
+    constructor(stage, canvasManager) {
+        this.stage = stage;
+        this.canvasManager = canvasManager;
+        this.tools = {
+            select: new SelectionTool(canvasManager),
+            line: new LineTool(canvasManager)
+        };
+        this.activeTool = this.tools.select;
+
+        this.stage.on("pointerclick", (e) => this.activeTool.onMouseDown(e));
+    }
+
+    setTool(toolName) {
+        if (this.tools[toolName]) {
+            this.activeTool = this.tools[toolName];
+        }
+    }
+}
+
+
+
+6. Why This Works Well
+✔ Encapsulates transformation logic in a separate module, keeping tools clean.
+✔ Allows future extension, such as multiple selection, snapping, or constraint-based transformations.
+✔ Eliminates repetitive logic inside UIController, which now focuses only on delegating events.
+Would you like me to suggest enhancements for constraints like rotation limits, grid snapping, or multi-selection?
+
+You're absolutely right to flag that! The event listener registration for switching tools should ideally live in a centralized UI handling module. Since UIController is responsible for managing user input, the best place to register these event listeners is inside the UIController constructor.
+
+Adding Tool Switching Logic
+Modify UIController.js so that it listens for tool selection changes both from buttons and keyboard shortcuts:
+class UIController {
+    constructor(stage, canvasManager) {
+        this.stage = stage;
+        this.canvasManager = canvasManager;
+        this.tools = {
+            select: new SelectionTool(canvasManager),
+            line: new LineTool(canvasManager),
+            text: new TextTool(canvasManager),
+            // Add more tools here
+        };
+        this.activeTool = this.tools.select;
+
+        // Register global event listeners for tool selection
+        this.setupEventListeners();
+
+        // Delegate pointer click events to the active tool
+        this.stage.on("pointerclick", (e) => this.activeTool.onMouseDown(e));
+        this.canvasManager.layer.on("dragmove", (e) => this.activeTool.onDrag(e));
+    }
+
+    setTool(toolName) {
+        if (this.tools[toolName]) {
+            this.activeTool = this.tools[toolName];
+            console.log(`Switched to tool: ${toolName}`);
+        }
+    }
+
+    setupEventListeners() {
+        // Button-based tool selection (for a toolbar UI)
+        document.getElementById("select-tool-btn").addEventListener("click", () => this.setTool("select"));
+        document.getElementById("line-tool-btn").addEventListener("click", () => this.setTool("line"));
+        document.getElementById("text-tool-btn").addEventListener("click", () => this.setTool("text"));
+
+        // Keyboard shortcuts for tool selection
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "s") this.setTool("select");
+            if (e.key === "l") this.setTool("line");
+            if (e.key === "t") this.setTool("text");
+        });
+    }
+}
+
+
+
+Why This Works Well
+✔ Centralizes all tool-switching logic inside UIController, keeping tool management consistent.
+✔ Keeps the constructor clean by moving event registration into a dedicated method (setupEventListeners).
+✔ Supports both UI buttons and keyboard shortcuts, giving users multiple ways to interact.
+Would you like help adding a status display somewhere that updates when the tool changes?
